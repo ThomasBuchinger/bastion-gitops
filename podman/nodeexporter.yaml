@@ -1,0 +1,96 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: node-exporter
+  labels:
+    app.kubernetes.io/instance: node-exporter
+    app.kubernetes.io/name: node-exporter
+    app.kubernetes.io/version: latest
+spec:
+  restartPolicy: Always
+  hostPID: true
+  hostNetwork: true
+  terminationGracePeriodSeconds: 30
+  securityContext:
+    fsGroup: 1001
+    fsGroupChangePolicy: Always
+  containers:
+    - name: node-exporter
+      args:
+        - '--path.procfs=/host/proc'
+        - '--path.sysfs=/host/sys'
+        - '--web.listen-address=0.0.0.0:9100'
+        - '--collector.systemd'
+          #- '--collector.systemd.unit-include=wg-quick@bastion.service,dnf-automatic.service'
+      # resources:
+      #  limits:
+      #    cpu: 150m
+      #    ephemeral-storage: 2Gi
+      #    memory: 192Mi
+      #  requests:
+      #    cpu: 100m
+      #    ephemeral-storage: 50Mi
+      #    memory: 128Mi
+      readinessProbe:
+        httpGet:
+          path: /
+          port: 9100
+          scheme: HTTP
+        initialDelaySeconds: 30
+        timeoutSeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 6
+      terminationMessagePath: /dev/termination-log
+      livenessProbe:
+        tcpSocket:
+          port: 9100
+        initialDelaySeconds: 120
+        timeoutSeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 6
+      securityContext:
+        runAsGroup: 1001
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        privileged: false
+        capabilities:
+          drop:
+            - ALL
+        seLinuxOptions: {}
+        allowPrivilegeEscalation: false
+      #  ports:
+      #  - name: metrics
+      #    hostPort: 9100
+      #    containerPort: 9100
+      #    protocol: TCP
+      imagePullPolicy: Always
+      volumeMounts:
+        - name: proc
+          readOnly: true
+          mountPath: /host/proc
+        - name: sys
+          readOnly: true
+          mountPath: /host/sys
+        - name: systemd
+          readOnly: true
+          mountPath: /var/run/dbus
+      terminationMessagePolicy: File
+      image: quay.io/prometheus/node-exporter:latest
+  volumes:
+    - name: proc
+      hostPath:
+        path: /proc
+        type: ''
+    - name: sys
+      hostPath:
+        path: /sys
+        type: ''
+    - name: systemd
+      hostPath:
+        path: /var/run/dbus
+        type: ''
